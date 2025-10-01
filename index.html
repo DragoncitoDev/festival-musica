@@ -1,0 +1,382 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Festival de Música - Multiprogramación</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const MusicFestivalScheduler = () => {
+          const [processes, setProcesses] = useState([]);
+          const [isRunning, setIsRunning] = useState(false);
+          const [currentTime, setCurrentTime] = useState(0);
+          const [ganttHistory, setGanttHistory] = useState([]);
+          const [currentProcessIndex, setCurrentProcessIndex] = useState(0);
+
+          const artistColors = [
+            '#FF6B9D', '#C44569', '#FFA07A', '#FFD93D', '#6BCB77',
+            '#4D96FF', '#9B59B6', '#FF8C94', '#A8E6CF', '#FFB6B9'
+          ];
+
+          const artists = [
+            { name: '🎸 Los Rockeros', songs: ['Riff Salvaje', 'Solo de Guitarra', 'Rock Anthem'] },
+            { name: '🎤 Estrella Pop', songs: ['Brillo', 'Baila Conmigo'] },
+            { name: '🎹 Piano Mágico', songs: ['Melodía Nocturna', 'Vals del Bosque', 'Sinfonía'] },
+            { name: '🥁 Tambores', songs: ['Ritmo Tribal', 'Beat Electrónico'] },
+            { name: '🎺 Jazz Club', songs: ['Swing Time', 'Blue Notes', 'Improviso'] },
+            { name: '🎻 Cuerdas', songs: ['Serenata', 'Concierto'] },
+            { name: '🎵 Coro Alegre', songs: ['Armonía', 'Voces del Cielo', 'Canto Feliz'] },
+            { name: '🎸 Banda Rock', songs: ['Metal Power', 'Riff Pesado'] },
+            { name: '🎼 Orquesta', songs: ['Sinfonía 9', 'Obertura', 'Final'] },
+            { name: '🎤 Rapero Cool', songs: ['Flow Rápido', 'Rimas'] }
+          ];
+
+          const initProcesses = () => {
+            return artists.map((artist, idx) => ({
+              id: idx,
+              name: artist.name,
+              color: artistColors[idx],
+              songs: artist.songs,
+              currentSong: 0,
+              timeRemaining: artist.songs.length * 2,
+              timeExecuted: 0,
+              timeWaiting: 0,
+              status: 'waiting',
+              quantum: 0,
+              priority: Math.random()
+            }));
+          };
+
+          useEffect(() => {
+            setProcesses(initProcesses());
+          }, []);
+
+          useEffect(() => {
+            if (!isRunning) return;
+
+            const interval = setInterval(() => {
+              setCurrentTime(t => t + 1);
+              
+              setProcesses(prevProcesses => {
+                const newProcesses = [...prevProcesses];
+                const activeProcesses = newProcesses.filter(p => p.timeRemaining > 0);
+                
+                if (activeProcesses.length === 0) {
+                  setIsRunning(false);
+                  return newProcesses;
+                }
+
+                let currentProc = null;
+                
+                if (Math.random() > 0.3) {
+                  const randomIdx = Math.floor(Math.random() * activeProcesses.length);
+                  currentProc = activeProcesses[randomIdx];
+                } else {
+                  let currentIdx = currentProcessIndex % activeProcesses.length;
+                  currentProc = activeProcesses[currentIdx];
+                  setCurrentProcessIndex(currentIdx + 1);
+                }
+
+                if (!currentProc) {
+                  setIsRunning(false);
+                  return newProcesses;
+                }
+
+                newProcesses.forEach(p => {
+                  if (p.id === currentProc.id) {
+                    p.status = 'executing';
+                    p.timeExecuted += 1;
+                    p.timeRemaining -= 1;
+                    p.quantum += 1;
+
+                    if (p.quantum >= 2 || p.timeRemaining === 0) {
+                      if (p.timeRemaining > 0) {
+                        p.currentSong = Math.min(p.currentSong + 1, p.songs.length - 1);
+                      }
+                      p.quantum = 0;
+                      p.status = p.timeRemaining === 0 ? 'finished' : 'waiting';
+                    }
+                  } else if (p.timeRemaining > 0) {
+                    p.status = 'waiting';
+                    p.timeWaiting += 1;
+                  }
+                });
+
+                setGanttHistory(prev => {
+                  const newEntry = {
+                    time: currentTime,
+                    processId: currentProc.id,
+                    processName: currentProc.name,
+                    color: currentProc.color
+                  };
+                  return [...prev, newEntry].slice(-100);
+                });
+
+                return newProcesses;
+              });
+            }, 1000);
+
+            return () => clearInterval(interval);
+          }, [isRunning, currentTime, currentProcessIndex]);
+
+          const handleStart = () => setIsRunning(true);
+          const handlePause = () => setIsRunning(false);
+          const handleReset = () => {
+            setIsRunning(false);
+            setCurrentTime(0);
+            setGanttHistory([]);
+            setCurrentProcessIndex(0);
+            setProcesses(initProcesses());
+          };
+
+          const currentExecuting = processes.find(p => p.status === 'executing');
+
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 p-6">
+              <div className="max-w-7xl mx-auto">
+                <div className="text-center mb-8">
+                  <h1 className="text-5xl font-bold text-purple-600 mb-2 flex items-center justify-center gap-3">
+                    <span className="text-5xl">🎵</span>
+                    Festival de Música - Multiprogramación
+                  </h1>
+                  <p className="text-xl text-gray-700">¡Un escenario, muchos artistas! 🎵</p>
+                </div>
+
+                <div className="flex justify-center gap-4 mb-8">
+                  <button
+                    onClick={handleStart}
+                    disabled={isRunning}
+                    className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-6 py-3 rounded-full font-bold text-lg flex items-center gap-2 shadow-lg transform transition hover:scale-105"
+                  >
+                    ▶️ Iniciar Festival
+                  </button>
+                  <button
+                    onClick={handlePause}
+                    disabled={!isRunning}
+                    className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-6 py-3 rounded-full font-bold text-lg flex items-center gap-2 shadow-lg transform transition hover:scale-105"
+                  >
+                    ⏸️ Pausar
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-full font-bold text-lg flex items-center gap-2 shadow-lg transform transition hover:scale-105"
+                  >
+                    🔄 Reiniciar
+                  </button>
+                </div>
+
+                <div className="text-center mb-6">
+                  <div className="inline-block bg-white px-8 py-4 rounded-full shadow-lg">
+                    <span className="text-3xl font-bold text-purple-600">⏱️ Tiempo: {currentTime}s</span>
+                  </div>
+                </div>
+
+                <div className="mb-8">
+                  <div className="bg-gradient-to-r from-purple-400 to-pink-400 rounded-3xl p-8 shadow-2xl">
+                    <h2 className="text-3xl font-bold text-white text-center mb-4">🎭 ESCENARIO (CPU) 🎭</h2>
+                    <div className="bg-white rounded-2xl p-6 min-h-[150px] flex items-center justify-center">
+                      {currentExecuting ? (
+                        <div className="text-center animate-bounce">
+                          <div className="text-6xl mb-3">{currentExecuting.name.split(' ')[0]}</div>
+                          <div className="text-2xl font-bold" style={{ color: currentExecuting.color }}>
+                            {currentExecuting.name}
+                          </div>
+                          <div className="text-xl text-gray-700 mt-2">
+                            🎵 Tocando: "{currentExecuting.songs[currentExecuting.currentSong]}"
+                          </div>
+                          <div className="text-lg text-purple-600 mt-2 font-bold">
+                            ♪ Quantum: {currentExecuting.quantum}/2 ♪
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-3xl text-gray-400">
+                          {processes.every(p => p.status === 'finished') && currentTime > 0
+                            ? '🎉 ¡Festival Terminado! 🎉'
+                            : '⭐ Esperando al primer artista... ⭐'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-8 bg-white rounded-3xl p-6 shadow-2xl">
+                  <h2 className="text-2xl font-bold text-purple-600 mb-4 text-center">📊 Diagrama de Gantt - Línea de Tiempo del Festival</h2>
+                  <div className="space-y-2">
+                    {processes.map((process) => {
+                      const executions = ganttHistory.filter(entry => entry.processId === process.id);
+                      const maxTime = Math.max(currentTime, 1);
+                      
+                      return (
+                        <div key={process.id} className="flex items-center gap-3">
+                          <div className="w-40 flex-shrink-0 font-semibold text-sm truncate" style={{ color: process.color }}>
+                            {process.name}
+                          </div>
+                          <div className="flex-1 bg-gray-100 rounded h-8 relative overflow-hidden">
+                            {executions.length > 0 && executions.map((exec, idx) => {
+                              let duration = 1;
+                              let startTime = exec.time;
+                              
+                              for (let i = idx + 1; i < executions.length; i++) {
+                                if (executions[i].time === executions[i - 1].time + 1) {
+                                  duration++;
+                                } else {
+                                  break;
+                                }
+                              }
+                              
+                              if (idx > 0 && executions[idx].time === executions[idx - 1].time + 1) {
+                                return null;
+                              }
+                              
+                              const leftPercent = (startTime / maxTime) * 100;
+                              const widthPercent = (duration / maxTime) * 100;
+                              
+                              return (
+                                <div
+                                  key={idx}
+                                  className="absolute top-0 h-full flex items-center justify-center text-white font-bold text-xs"
+                                  style={{
+                                    backgroundColor: process.color,
+                                    left: `${leftPercent}%`,
+                                    width: `${widthPercent}%`,
+                                    minWidth: '8px'
+                                  }}
+                                  title={`${process.name}: ${startTime}-${startTime + duration}s`}
+                                >
+                                  {duration > 3 && `${duration}s`}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div className="w-20 text-right text-xs font-semibold text-gray-600">
+                            {process.timeExecuted}s
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-4 flex justify-between text-xs text-gray-500 px-40">
+                    <span>0s</span>
+                    <span>{Math.floor(currentTime / 2)}s</span>
+                    <span>{currentTime}s</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {processes.map((process) => (
+                    <div
+                      key={process.id}
+                      className={`rounded-2xl p-6 shadow-xl transform transition ${
+                        process.status === 'executing' 
+                          ? 'scale-105 ring-4 ring-yellow-400' 
+                          : process.status === 'finished'
+                          ? 'opacity-60'
+                          : ''
+                      }`}
+                      style={{ backgroundColor: process.color + '20', borderLeft: `8px solid ${process.color}` }}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xl font-bold" style={{ color: process.color }}>
+                          {process.name}
+                        </h3>
+                        <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                          process.status === 'executing' ? 'bg-green-500 text-white animate-pulse' :
+                          process.status === 'finished' ? 'bg-gray-400 text-white' :
+                          'bg-yellow-400 text-gray-800'
+                        }`}>
+                          {process.status === 'executing' ? '🎤 EN VIVO' :
+                           process.status === 'finished' ? '✅ FIN' : '⏳ ESPERA'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 mb-3">
+                        <div className="text-sm font-semibold text-gray-700">
+                          🎵 Repertorio ({process.currentSong + 1}/{process.songs.length}):
+                        </div>
+                        {process.songs.map((song, idx) => (
+                          <div
+                            key={idx}
+                            className={`text-sm p-2 rounded ${
+                              idx === process.currentSong && process.status === 'executing'
+                                ? 'bg-yellow-200 font-bold'
+                                : idx < process.currentSong
+                                ? 'bg-gray-200 line-through'
+                                : 'bg-white'
+                            }`}
+                          >
+                            {idx < process.currentSong ? '✓' : idx === process.currentSong ? '▶️' : '○'} {song}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                        <div className="bg-blue-100 p-2 rounded">
+                          <div className="font-bold text-blue-700">⏱️ Ejecutado</div>
+                          <div className="text-lg font-bold">{process.timeExecuted}s</div>
+                        </div>
+                        <div className="bg-orange-100 p-2 rounded">
+                          <div className="font-bold text-orange-700">⏳ Espera</div>
+                          <div className="text-lg font-bold">{process.timeWaiting}s</div>
+                        </div>
+                        <div className="bg-purple-100 p-2 rounded">
+                          <div className="font-bold text-purple-700">📝 Restante</div>
+                          <div className="text-lg font-bold">{process.timeRemaining}s</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-8 bg-white rounded-3xl p-6 shadow-2xl">
+                  <h2 className="text-2xl font-bold text-purple-600 mb-4 text-center">📈 Estadísticas Generales del Festival</h2>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div className="bg-gradient-to-br from-blue-100 to-blue-200 p-4 rounded-xl">
+                      <div className="text-3xl mb-2">⏱️</div>
+                      <div className="text-sm font-semibold text-gray-700">Tiempo Total</div>
+                      <div className="text-2xl font-bold text-blue-700">{currentTime}s</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-green-100 to-green-200 p-4 rounded-xl">
+                      <div className="text-3xl mb-2">✅</div>
+                      <div className="text-sm font-semibold text-gray-700">Completados</div>
+                      <div className="text-2xl font-bold text-green-700">
+                        {processes.filter(p => p.status === 'finished').length}/{processes.length}
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-br from-orange-100 to-orange-200 p-4 rounded-xl">
+                      <div className="text-3xl mb-2">⏳</div>
+                      <div className="text-sm font-semibold text-gray-700">Espera Total</div>
+                      <div className="text-2xl font-bold text-orange-700">
+                        {processes.reduce((sum, p) => sum + p.timeWaiting, 0)}s
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-br from-purple-100 to-purple-200 p-4 rounded-xl">
+                      <div className="text-3xl mb-2">🎵</div>
+                      <div className="text-sm font-semibold text-gray-700">Ejecución Total</div>
+                      <div className="text-2xl font-bold text-purple-700">
+                        {processes.reduce((sum, p) => sum + p.timeExecuted, 0)}s
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        ReactDOM.render(<MusicFestivalScheduler />, document.getElementById('root'));
+    </script>
+</body>
+</html>
